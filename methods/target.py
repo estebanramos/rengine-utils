@@ -1,8 +1,9 @@
 import methods.utils as utils
+import pyperclip
 
 
-def generateSummaryByTargetName(name, s, project_name):
-        target_id = findTargetIdByName(name, s)['target_id']
+def generateSummaryByTargetName(name, s, project_name, clip):
+        #target_id = findTargetIdByName(name, s)['target_id']
         subdomain_summary = getSubdomainsByTargetName(name, s, project_name)
         subdomain_list = subdomain_summary['subdomains']
         vulnerabilities_list = getVulnerabilitiesByTargetName(name, s)
@@ -17,6 +18,13 @@ def generateSummaryByTargetName(name, s, project_name):
         for item in subdomain_list:
             utils.cleanUselessStuffFromDict(item['subdomain'], ['id'])
             print(utils.prettyPrintJSON(item))
+        if clip:
+            try:
+                pyperclip.copy(str(subdomain_list))
+                print("The report has been copied to your clipboard!")
+            except Exception as e:
+                print("Error copying the report to your clipboard")
+                print(e)
 
 
 def listVulnerabilitiesByTargetName(name, s):
@@ -73,7 +81,10 @@ def getVulnerabilitiesByTargetName(name, s):
     root = {"domain": name, "subdomains": []}
     temporal = {}
     for item in j['data']:
-        subdomain = item['subdomain']['name']
+        if item['subdomain'] :
+            subdomain = item['subdomain']['name']
+        else:
+            subdomain = item['http_url'].strip('https://').split('/')[0]
         vulnerability_name = item['name']
         affected_url = item['http_url']
         severity = item['severity']

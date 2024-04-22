@@ -1,11 +1,9 @@
-import argparse
-import requests
-import json
-import os
+import argparse, sys, urllib3
 import authorize
-from methods import target, project
+from methods import target
 import sys
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def error(parser,message):
         sys.stderr.write('error: %s\n' % message+'\n')
@@ -49,6 +47,7 @@ target_list_parser.add_argument("--clean", action="store_true", help="Simplify t
 target_summary_parser = target_action_subparser.add_parser("generate-summary", help="Generates a summary of a domain subdomains and its vulnerabilities")
 target_summary_parser.add_argument('-t', metavar='--target', dest='target_name', required=True)
 target_summary_parser.add_argument('-p', metavar='--project', dest='project_name', required=True, help="ReNgine's Project Name")
+target_summary_parser.add_argument('--clip', action="store_true", help='Copy the report to clipboard')
 
 
 
@@ -91,7 +90,8 @@ match args.options:
                 case 'list-vulnerabilities':
                     target.listVulnerabilitiesByTargetName(args.target_name, s)
                 case 'generate-summary':
-                    target.generateSummaryByTargetName(args.target_name, s, args.project_name)
-        except:
+                    target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip)
+        except Exception as e:
+            print("An error as occurred")
             target_parser.print_help()
             
