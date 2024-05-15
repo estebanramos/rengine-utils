@@ -1,8 +1,9 @@
 import methods.utils as utils
 import pyperclip
+import os
 
 
-def generateSummaryByTargetName(name, s, project_name, clip):
+def generateSummaryByTargetName(name, s, project_name, clip, output):
         #target_id = findTargetIdByName(name, s)['target_id']
         subdomain_summary = getSubdomainsByTargetName(name, s, project_name)
         subdomain_list = subdomain_summary['subdomains']
@@ -15,9 +16,16 @@ def generateSummaryByTargetName(name, s, project_name, clip):
             for item3 in urls_list:
                 if 'urls' in item3.keys() and (item['subdomain']['subdomain_name'] == item3['subdomain_name']):
                     item['subdomain']['urls'] = item3['urls']
+        
+        if output: f = open(output, 'w+')
         for item in subdomain_list:
             utils.cleanUselessStuffFromDict(item['subdomain'], ['id'])
             print(utils.prettyPrintJSON(item))
+            if output: f.write(utils.prettyPrintJSON(item))
+        
+        if os.path.isfile('.rengineSession'):
+            print(f"Report has been copied to {output}")
+              
         if clip:
             try:
                 pyperclip.copy(str(subdomain_list))
@@ -25,6 +33,8 @@ def generateSummaryByTargetName(name, s, project_name, clip):
             except Exception as e:
                 print("Error copying the report to your clipboard")
                 print(e)
+
+        
 
 
 def listVulnerabilitiesByTargetName(name, s):

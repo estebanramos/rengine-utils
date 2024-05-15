@@ -1,7 +1,8 @@
 import argparse, sys, urllib3
 import authorize
-from methods import target
+from methods import target, project
 import sys
+import traceback
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -16,6 +17,7 @@ option_subparsers = main_parser.add_subparsers(title="options",dest="options")
 
 auth_parser = option_subparsers.add_parser("authorize", help="",parents=[parent_parser])
 target_parser = option_subparsers.add_parser("target", help="",parents=[parent_parser])
+project_parser = option_subparsers.add_parser("project", help="", parents=[parent_parser])
 
 
 #Auth parsers
@@ -48,14 +50,17 @@ target_summary_parser = target_action_subparser.add_parser("generate-summary", h
 target_summary_parser.add_argument('-t', metavar='--target', dest='target_name', required=True)
 target_summary_parser.add_argument('-p', metavar='--project', dest='project_name', required=True, help="ReNgine's Project Name")
 target_summary_parser.add_argument('--clip', action="store_true", help='Copy the report to clipboard')
+target_summary_parser.add_argument('-o', help='Copy the report to a file', dest='output_filename')
 
+#Projects
+project_parser.add_argument("-l", "--list", action="store_true", help="List the projects")
+project_parser.add_argument("-df", action="store_true", help="Returns the default project for the User logged")
 
-
-#Main section
 try:
     args = main_parser.parse_args()
 except Exception as e:
     print(e)
+
 
 if(args.options == 'authorize'):
     if args.d:
@@ -65,9 +70,12 @@ if(args.options == 'authorize'):
     else:
         error(auth_parser, 'Missing parameters --username & --password')
 else:
-    s = authorize.getSession()
+    if(authorize.getSession()): 
+        s = authorize.getSession()
+    else:
+        exit()
 
-
+        
 match args.options:
     case 'target':
         try:
@@ -90,8 +98,22 @@ match args.options:
                 case 'list-vulnerabilities':
                     target.listVulnerabilitiesByTargetName(args.target_name, s)
                 case 'generate-summary':
-                    target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip)
+                    target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename)
+                case _:
+                    target_parser.print_help()
+        except AttributeError:
+            target_parser.print_help()
         except Exception as e:
             print("An error as occurred")
-            target_parser.print_help()
+            traceback.print_exc()
+    case 'project':
+        if args.list:
+            print("Projects listed in Rengine instance: ")
+            projects = project.listProjects(s, project.getDefaultProject(s))
+            for project in projects:
+                print(project)
+        elif args.df:
+            print(f"Default project for current session: {project.getDefaultProject(s)}")
+        else:
+            project_parser.print_help()
             
