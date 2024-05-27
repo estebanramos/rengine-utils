@@ -96,7 +96,10 @@ match args.options:
                     else:
                         error(target_list_endpoints_parser, 'Must specify one on the parameters -t or -s')
                 case 'list-vulnerabilities':
-                    target.listVulnerabilitiesByTargetName(args.target_name, s)
+                    if(target.TargetExists(args.target_name, s)):
+                        target.listVulnerabilitiesByTargetName(args.target_name, s)
+                    else:
+                        target.listVulnerabilitiesBySubdomain(args.target_name, s)
                 case 'generate-summary':
                     target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename)
                 case _:
