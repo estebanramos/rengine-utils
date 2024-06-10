@@ -1,6 +1,6 @@
 import argparse, sys, urllib3
 import authorize
-from methods import target, project
+from methods import target, project, export
 import sys
 import traceback
 
@@ -27,31 +27,39 @@ auth_parser.add_argument("-p", metavar="--password", action="store",help="ReNgin
 auth_parser.add_argument("-d", action="store_true",help="Deletes your session.  You should always do this once finished with the tool")
 
 
-#Targets
+# Targets
 target_action_subparser = target_parser.add_subparsers(title="target_action",dest="target_action_command")
-
+## Target Subdomains
 target_list_subdomains_parser = target_action_subparser.add_parser("list-subdomains",help="List target found subdomains", parents=[parent_parser])
 target_list_subdomains_parser.add_argument('-t', metavar='--target', dest='target_name', required=True)
 target_list_subdomains_parser.add_argument('-p', metavar='--project', dest='project_name', required=True, help="ReNgine's Project Name")
-
+target_list_subdomains_parser.add_argument('--format',choices=['json', 'table'], default='table', help='Output format', dest='output_format')
+## Target Endpoints
 target_list_endpoints_parser = target_action_subparser.add_parser("list-endpoints", help="List endpoints by target name or subdomain name")
 target_list_endpoints_parser.add_argument('-t', metavar='--target', dest='target_name')
 target_list_endpoints_parser.add_argument('-s', metavar='--subdomain', dest='subdomain_name')
 target_list_endpoints_parser.add_argument('-p', metavar='--project', dest='project_name', required=True, help="ReNgine's Project Name")
-
+## Target Vulnerabilities
 target_list_vulnerabilities_parser = target_action_subparser.add_parser("list-vulnerabilities", help="List endpoints by target name or subdomain name")
 target_list_vulnerabilities_parser.add_argument('-t', metavar='--target', dest='target_name')
-
-
+## List Targets
 target_list_parser = target_action_subparser.add_parser("list", help="List targets", parents=[parent_parser])
-target_list_parser.add_argument("--clean", action="store_true", help="Simplify the output")
-
+target_list_parser.add_argument("--clean", action="store_true", help="Simplify the JSON output")
+target_list_parser.add_argument('--format',choices=['json', 'table'], default='table', help='Output format', dest='output_format')
+## Summary
 target_summary_parser = target_action_subparser.add_parser("generate-summary", help="Generates a summary of a domain subdomains and its vulnerabilities")
 target_summary_parser.add_argument('-t', metavar='--target', dest='target_name', required=True)
 target_summary_parser.add_argument('-p', metavar='--project', dest='project_name', required=True, help="ReNgine's Project Name")
+target_summary_parser.add_argument('--show',action='store_true',help='Print the report to stdout')
 target_summary_parser.add_argument('--clip', action="store_true", help='Copy the report to clipboard')
 target_summary_parser.add_argument('-o', help='Copy the report to a file', dest='output_filename')
-
+### Summary Export
+target_summary_subparser = target_summary_parser.add_subparsers(title="export",dest="export_action")
+target_summary_subparser_elastic = target_summary_subparser.add_parser('export-to-elastic',help='Export to Elasticsearch')
+target_summary_subparser_elastic.add_argument('--host',dest="es_host")
+target_summary_subparser_elastic.add_argument('--user','--username',dest='es_username')
+target_summary_subparser_elastic.add_argument('--password',dest='es_password')
+target_summary_subparser_export = target_summary_subparser.add_parser('export-to-faraday', help='Export to faraday')
 #Projects
 project_parser.add_argument("-l", "--list", action="store_true", help="List the projects")
 project_parser.add_argument("-df", action="store_true", help="Returns the default project for the User logged")
@@ -81,13 +89,19 @@ match args.options:
         try:
             match args.target_action_command.lower():
                 case 'list':
-                    if args.clean:
-                        target.listCleanTargets(s)
-                    else:
-                        target.listTargets(s)
+                    match args.output_format:
+                        case 'json':
+                            if args.clean: target.listCleanTargets(s)
+                            else: target.listTargets(s)
+                        case 'table':
+                            target.listTargetsTable(s)
                 case 'list-subdomains':
                     if args.project_name:
-                        target.listSubdomainsByTargetName(args.target_name, s, args.project_name)
+                        match args.output_format:
+                            case 'json':
+                                target.listSubdomainsByTargetNameJSON(args.target_name, s, args.project_name)
+                            case 'table':
+                                target.listSubdomainsByTargetNameTable(args.target_name, s, args.project_name)
                 case 'list-endpoints':
                     if args.target_name:
                         target.listEndpointsByTargetName(args.target_name, s, args.project_name)
@@ -101,11 +115,21 @@ match args.options:
                     else:
                         target.listVulnerabilitiesBySubdomain(args.target_name, s)
                 case 'generate-summary':
-                    target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename)
+                    report = target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename, args.show)
+                    match args.export_action:
+                        case 'export-to-elastic':
+                            try:
+                                es = export.initialize(args.es_host, args.es_username, args.es_password)
+                                export.indexDocument(es, 'rengine', report)
+                                print("OK")
+                            except:
+                                print("FAIL")
+                                traceback.print_exc()
                 case _:
                     target_parser.print_help()
         except AttributeError:
             target_parser.print_help()
+            traceback.print_exc()
         except Exception as e:
             print("An error as occurred")
             traceback.print_exc()
