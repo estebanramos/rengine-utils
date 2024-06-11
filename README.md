@@ -1,11 +1,10 @@
 # ReNgine Utils
-[ReNgine](https://github.com/yogeshojha/rengine) CLI tool based on [rengine-tool](https://github.com/glownd/rengine-tool/) by [@glownd](https://github.com/glownd) (Rollina).
-
-All outputs are in JSON format by default.
+[ReNgine](https://github.com/yogeshojha/rengine) CLI tool based on [rengine-tool](https://github.com/glownd/rengine-tool/) by [@glownd](https://github.com/glownd).
 
 ## Features
-- List Vulnerabilities, Subdomains and Endpoints by Target Name (Domain Name)
-- Generate Reports/Summary in JSON format by Target Name
+- List Vulnerabilities, Subdomains and Endpoints by Domain or Subdomain name
+- Generate Reports/Summary in various formats (JSON/CSV/Table)
+- Export to visualization/reporting services like Elasticsearch or Faraday
 
 ### Authorize
 Authorizing is needed to use the tool.
@@ -45,9 +44,16 @@ options:
   -df         Returns the default project for the User logged
 ```
 
-# To do 
+# To do
+- General & QOL
+    - Error & exception handling
+    - Code Refactoring
+        - Duplicated Code
+        - Spaghetti
+        - Better Encapsulation (Improve Reusing)
+    - Better Documentation/README (lol)
 - Exporting & Reporting
-    - Export reports to ElasticSearch
+    - Export reports to ElasticSearch ✅
     - Export reports to Faraday
     - Modular Report (Vuln/Subdomains/Urls sections)
 - Technologies

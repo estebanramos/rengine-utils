@@ -1,6 +1,6 @@
 import argparse, sys, urllib3
 import authorize
-from methods import target, project, export
+from methods import elastic_export, target, project
 import sys
 import traceback
 
@@ -19,13 +19,11 @@ auth_parser = option_subparsers.add_parser("authorize", help="",parents=[parent_
 target_parser = option_subparsers.add_parser("target", help="",parents=[parent_parser])
 project_parser = option_subparsers.add_parser("project", help="", parents=[parent_parser])
 
-
 #Auth parsers
 auth_parser.add_argument("-b", metavar="--base-url", action="store",help="URL (ie: https://localhost/)", default="https://localhost/",dest='base_url')
 auth_parser.add_argument("-u", metavar="--user", action="store",help="ReNgine Username", dest='username')
 auth_parser.add_argument("-p", metavar="--password", action="store",help="ReNgine Password", dest='password')
 auth_parser.add_argument("-d", action="store_true",help="Deletes your session.  You should always do this once finished with the tool")
-
 
 # Targets
 target_action_subparser = target_parser.add_subparsers(title="target_action",dest="target_action_command")
@@ -119,8 +117,8 @@ match args.options:
                     match args.export_action:
                         case 'export-to-elastic':
                             try:
-                                es = export.initialize(args.es_host, args.es_username, args.es_password)
-                                export.indexDocument(es, 'rengine', report)
+                                es = elastic_export.initialize(args.es_host, args.es_username, args.es_password)
+                                elastic_export.indexDocument(es, 'rengine', report)
                                 print("OK")
                             except:
                                 print("FAIL")
