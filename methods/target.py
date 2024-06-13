@@ -40,6 +40,28 @@ def generateSummaryByTargetName(name, s, project_name, clip, output, show):
     return subdomain_list
 
 
+def generateGeneralSummary(name, s, project_name):
+    target_list = getTargets(s)
+    general_summary = []
+    for target in target_list:
+        print("Now processing: ", target['name'])
+        subdomain_summary = getSubdomainsByTargetName(target['name'], s, project_name)
+        subdomain_list = subdomain_summary['subdomains']
+        vulnerabilities_list = getVulnerabilitiesByTargetName(name, s)
+        urls_list = getEndpointsByTargetName(name, s, project_name)
+        for item in subdomain_list:
+            for item2 in vulnerabilities_list:
+                if item['subdomain']['subdomain_name'] == item2['subdomain']['name']:
+                    item['subdomain']['vulnerabilities'] = item2['subdomain']['vulnerabilities']
+            for item3 in urls_list:
+                if 'urls' in item3.keys() and (
+                        item['subdomain']['subdomain_name'] == item3['subdomain_name']):
+                    item['subdomain']['urls'] = item3['urls']
+        print(subdomain_list)
+        general_summary.append(subdomain_list)
+    return general_summary
+
+
 def listVulnerabilitiesByTargetName(name, s):
     target_id = findTargetIdByName(name, s)['target_id']
     baseUrl = s.cookies['hostname']
@@ -109,6 +131,7 @@ def getVulnerabilitiesByTargetName(name, s):
         severity = item['severity']
         source = item['source']
         description = item['description']
+        tags = item['tags']
         if subdomain not in temporal.keys():
             i = {"subdomain": {
                 "name": subdomain,
@@ -118,7 +141,8 @@ def getVulnerabilitiesByTargetName(name, s):
                         "severity": severity,
                         "affected_url": affected_url,
                         "source": source,
-                        "description": description
+                        "description": description,
+                        "tags": tags
                     }
                 ]
             }
@@ -130,7 +154,8 @@ def getVulnerabilitiesByTargetName(name, s):
                     "severity": severity,
                     "affected_url": affected_url,
                     "source": source,
-                    "description": description
+                    "description": description,
+                    "tags": tags
                     }
             temporal[subdomain]['subdomain']['vulnerabilities'].append(vuln)
     return root['subdomains']
@@ -382,6 +407,16 @@ def listTargets(s):
     for item in j:
         print(utils.prettyPrintJSON(item))
     print("\nIf you want a more clean output try using --clean")
+    return j
+
+def getTargets(s):
+    baseUrl = s.cookies['hostname']
+    listIPsUrl = baseUrl + '/api/listTargets/?format=datatables'
+    csrf_token = s.cookies['csrftoken']
+    headers = {'Referer': listIPsUrl,
+               'Content-type': 'application/json', 'X-CSRFToken': csrf_token}
+    r = s.get(listIPsUrl, headers=headers, verify=False)
+    j = r.json()['data']
     return j
 
 

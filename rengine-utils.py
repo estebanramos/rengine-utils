@@ -53,11 +53,14 @@ target_summary_parser.add_argument('--clip', action="store_true", help='Copy the
 target_summary_parser.add_argument('-o', help='Copy the report to a file', dest='output_filename')
 ### Summary Export
 target_summary_subparser = target_summary_parser.add_subparsers(title="export",dest="export_action")
+target_summary_subparser_export = target_summary_subparser.add_parser('export-to-faraday', help='Export to faraday')
+#### Summary Elastic Export
 target_summary_subparser_elastic = target_summary_subparser.add_parser('export-to-elastic',help='Export to Elasticsearch')
 target_summary_subparser_elastic.add_argument('--host',dest="es_host")
 target_summary_subparser_elastic.add_argument('--user','--username',dest='es_username')
 target_summary_subparser_elastic.add_argument('--password',dest='es_password')
-target_summary_subparser_export = target_summary_subparser.add_parser('export-to-faraday', help='Export to faraday')
+target_summary_subparser_elastic.add_argument('--index','-i',dest='es_index',default='rengine',help='Elasticsearch index in which store the data/report')
+
 #Projects
 project_parser.add_argument("-l", "--list", action="store_true", help="List the projects")
 project_parser.add_argument("-df", action="store_true", help="Returns the default project for the User logged")
@@ -118,7 +121,7 @@ match args.options:
                         case 'export-to-elastic':
                             try:
                                 es = elastic_export.initialize(args.es_host, args.es_username, args.es_password)
-                                elastic_export.indexDocument(es, 'rengine', report)
+                                elastic_export.indexDocument(es, args.es_index, report)
                                 print("OK")
                             except:
                                 print("FAIL")
