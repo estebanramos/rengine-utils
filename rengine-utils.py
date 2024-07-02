@@ -1,8 +1,6 @@
-import argparse, sys, urllib3
+import argparse, sys, urllib3, sys, traceback, pyperclip
 import authorize
 from methods import elastic_export, target, project
-import sys
-import traceback
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -112,7 +110,11 @@ match args.options:
                         error(target_list_endpoints_parser, 'Must specify one on the parameters -t or -s')
                 case 'list-vulnerabilities':
                     if(target.TargetExists(args.target_name, s)):
-                        target.listVulnerabilitiesByTargetName(args.target_name, s)
+                        #target.listVulnerabilitiesByTargetName(args.target_name, s)
+                        vulns = target.getVulnerabilitiesByTargetName(args.target_name,s)
+                        pyperclip.copy(str(vulns))
+                        filtered = target.removeAndJoinDuplicateVulns(vulns)
+                        pyperclip.copy(str(filtered))
                     else:
                         target.listVulnerabilitiesBySubdomain(args.target_name, s)
                 case 'generate-summary':

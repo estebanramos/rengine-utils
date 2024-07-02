@@ -516,43 +516,36 @@ def listVulnerabilitiesBySubdomain(subdomain_name, s, project_name):
 def removeAndJoinDuplicateVulns(dict):
     re_parameter = r"Vulnerable Parameter:\s*(\S+)"
     re_payload = r"Payload: Reflected Payload in Attribute: (\S+)"
-    first_dalfox = True
-    first_dalfox_element = {}
-    for vuln in dict:
-        source = vuln['source']
-        # dalfox filtering
-        if source == 'dalfox':
-            if first_dalfox:
-                first_dalfox = False
+    for item in dict:
+        first_dalfox = True
+        first_dalfox_element = None
+        dalfox_count =  0
+        indices_to_remove = []
+        for idx, vuln in enumerate(item['subdomain']['vulnerabilities']):
+            source = vuln['source']
+            # dalfox filtering
+            if source == 'dalfox':
+                dalfox_count += 1
                 clean_url = vuln['affected_url'].split('?')[0]
                 if re.search(re_parameter, vuln['description']):
-                    vulnerable_parameter = re.search(
-                        re_parameter, vuln['description']).group(1)
+                        vulnerable_parameter = re.search(re_parameter, vuln['description']).group(1)
                 if re.search(re_payload, vuln['description']):
-                    payload = re.search(
-                        re_payload, vuln['description']).group(1)
-                first_dalfox_element = vuln
-                first_dalfox_element['payloads'] = []
-                first_dalfox_element['vulnerable_parameter'] = vulnerable_parameter
-                first_dalfox_element['payloads'].append(payload)
-                first_dalfox_element['clean_url'] = clean_url
-            else:
-                clean_url = vuln['affected_url'].split('?')[0]
-                if re.search(re_parameter, vuln['description']):
-                    vulnerable_parameter = re.search(
-                        re_parameter, vuln['description']).group(1)
-                if re.search(re_payload, vuln['description']):
-                    payload = re.search(
-                        re_payload, vuln['description']).group(1)
-                if clean_url == first_dalfox_element['clean_url'] and first_dalfox_element[
-                        'vulnerable_parameter'] == vulnerable_parameter:
+                        payload = re.search(re_payload, vuln['description']).group(1)
+                if first_dalfox:
+                    first_dalfox = False
+                    first_dalfox_element = vuln
+                    first_dalfox_element['payloads'] = []
+                    first_dalfox_element['vulnerable_parameter'] = vulnerable_parameter
                     first_dalfox_element['payloads'].append(payload)
-        # end dalfox filtering
-    filtered = dict[0]
-    filtered.pop('description')
-    print(utils.prettyPrintJSON(filtered))
-    return filtered
-
+                    first_dalfox_element['clean_url'] = clean_url
+                else:
+                    if clean_url == first_dalfox_element['clean_url'] and first_dalfox_element['vulnerable_parameter'] == vulnerable_parameter:
+                        first_dalfox_element['payloads'].append(payload)
+                    indices_to_remove.append(idx)
+            # end dalfox filtering
+        for index in sorted(indices_to_remove, reverse=True):
+            del item['subdomain']['vulnerabilities'][index]
+    return dict
 # for some reason or a rengine's bug sometimes you have duplicated subdomains with no info
 def removeDuplicatedSubdomains(dict):
     subdomain_dict = {}
