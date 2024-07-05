@@ -2,6 +2,7 @@ import methods.utils as utils
 import pyperclip, os, re, socket, requests
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 def generateSummaryByTargetName(name, s, project_name, clip, output, show):
     # target_id = findTargetIdByName(name, s)['target_id']
@@ -40,15 +41,17 @@ def generateSummaryByTargetName(name, s, project_name, clip, output, show):
     return subdomain_list
 
 
-def generateGeneralSummary(name, s, project_name):
+def generateGeneralSummary(s, project_name):
+    console = Console()
+    console.print(Text('This should take a while...grab a coffee', style='bold yellow'))
     target_list = getTargets(s)
     general_summary = []
     for target in target_list:
         print("Now processing: ", target['name'])
         subdomain_summary = getSubdomainsByTargetName(target['name'], s, project_name)
         subdomain_list = subdomain_summary['subdomains']
-        vulnerabilities_list = getVulnerabilitiesByTargetName(name, s)
-        urls_list = getEndpointsByTargetName(name, s, project_name)
+        vulnerabilities_list = getVulnerabilitiesByTargetName(target['name'], s)
+        urls_list = getEndpointsByTargetName(target['name'], s, project_name)
         for item in subdomain_list:
             for item2 in vulnerabilities_list:
                 if item['subdomain']['subdomain_name'] == item2['subdomain']['name']:
@@ -59,6 +62,7 @@ def generateGeneralSummary(name, s, project_name):
                     item['subdomain']['urls'] = item3['urls']
         print(subdomain_list)
         general_summary.append(subdomain_list)
+    console.print(Text('Finished generating report', style='bold yellow'))
     return general_summary
 
 
@@ -230,7 +234,7 @@ def listSubdomainsByTargetNameJSON(name, s, project):
     target_id = findTargetIdByName(name, s)['target_id']
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + \
-        f'/api/listDatatableSubdomain/?project={project.lower()}&target_id={target_id}&format=datatables'
+        f'/api/listDatatableSubdomain/?project={project.lower()}&target_id={target_id}&format=datatables&length=0'
     csrf_token = s.cookies['csrftoken']
     headers = {'Referer': listIPsUrl,
                'Content-type': 'application/json', 'X-CSRFToken': csrf_token}
@@ -275,6 +279,7 @@ def listSubdomainsByTargetNameJSON(name, s, project):
     for item in root['subdomains']:
         utils.cleanUselessStuffFromDict(item['subdomain'], ['id'])
         print(utils.prettyPrintJSON(item) + ',')
+    pyperclip.copy(str(root['subdomains']))
 
 
 def listSubdomainsByTargetNameTable(name, s, project):
@@ -286,7 +291,7 @@ def listSubdomainsByTargetNameTable(name, s, project):
     target_id = findTargetIdByName(name, s)['target_id']
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + \
-        f'/api/listDatatableSubdomain/?project={project.lower()}&target_id={target_id}&format=datatables'
+        f'/api/listDatatableSubdomain/?project={project.lower()}&target_id={target_id}&format=datatables&length=0'
     csrf_token = s.cookies['csrftoken']
     headers = {'Referer': listIPsUrl,
                'Content-type': 'application/json', 'X-CSRFToken': csrf_token}
@@ -297,7 +302,7 @@ def listSubdomainsByTargetNameTable(name, s, project):
         return {}
     root = j['data']
     table = Table(title=f'Subdomains for {name}')
-    columns = ["Subdomain", "HTTP Status", "Page Title", "IPs Addresses", "ID"]
+    columns = ["Subdomain", "HTTP Status", "Page Title", "IPs Addresses", "Ports", "ID"]
     for column in columns:
         table.add_column(column)
     for item in root:
@@ -316,10 +321,17 @@ def listSubdomainsByTargetNameTable(name, s, project):
             item['http_status'] = ''
         http_status_str = str(item['http_status'])
         http_status_style = 'green' if http_status_str == '200' else 'red'
+        port_numbers = []
+        for ip_info in item['ip_addresses']:
+            if 'ports' in ip_info:
+                for port in ip_info['ports']:
+                    port_numbers.append(port['number'])
+        unique_ports = " ".join(map(str, set(port_numbers)))
         row = [item['name'],
                f"[{http_status_style}]{http_status_str}[/{http_status_style}]",
                item['page_title'],
                ipv4_addresses_str,
+               unique_ports,
                str(item['id'])]
         table.add_row(*row)
     console = Console()

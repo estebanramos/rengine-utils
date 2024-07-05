@@ -49,6 +49,7 @@ target_summary_parser.add_argument('-p', metavar='--project', dest='project_name
 target_summary_parser.add_argument('--show',action='store_true',help='Print the report to stdout')
 target_summary_parser.add_argument('--clip', action="store_true", help='Copy the report to clipboard')
 target_summary_parser.add_argument('-o', help='Copy the report to a file', dest='output_filename')
+target_summary_parser.add_argument('-all', action="store_true", help='Generates a summary of all targets. Does not output to stdout for visibility reasons')
 ### Summary Export
 target_summary_subparser = target_summary_parser.add_subparsers(title="export",dest="export_action")
 target_summary_subparser_export = target_summary_subparser.add_parser('export-to-faraday', help='Export to faraday')
@@ -118,7 +119,10 @@ match args.options:
                     else:
                         target.listVulnerabilitiesBySubdomain(args.target_name, s)
                 case 'generate-summary':
-                    report = target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename, args.show)
+                    if args.all:
+                        report = target.generateGeneralSummary(s, args.project_name.lower())
+                    else:
+                        report = target.generateSummaryByTargetName(args.target_name, s, args.project_name.lower(), args.clip, args.output_filename, args.show)
                     match args.export_action:
                         case 'export-to-elastic':
                             try:
