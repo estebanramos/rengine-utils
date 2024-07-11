@@ -49,19 +49,21 @@ def generateGeneralSummary(s, project_name):
     for target in target_list:
         print("Now processing: ", target['name'])
         subdomain_summary = getSubdomainsByTargetName(target['name'], s, project_name)
-        subdomain_list = subdomain_summary['subdomains']
-        vulnerabilities_list = getVulnerabilitiesByTargetName(target['name'], s)
-        urls_list = getEndpointsByTargetName(target['name'], s, project_name)
-        for item in subdomain_list:
-            for item2 in vulnerabilities_list:
-                if item['subdomain']['subdomain_name'] == item2['subdomain']['name']:
-                    item['subdomain']['vulnerabilities'] = item2['subdomain']['vulnerabilities']
-            for item3 in urls_list:
-                if 'urls' in item3.keys() and (
-                        item['subdomain']['subdomain_name'] == item3['subdomain_name']):
-                    item['subdomain']['urls'] = item3['urls']
-        print(subdomain_list)
-        general_summary.append(subdomain_list)
+        if 'subdomains' in subdomain_summary:
+            subdomain_list = subdomain_summary['subdomains']
+            vulnerabilities_list = getVulnerabilitiesByTargetName(target['name'], s)
+            urls_list = getEndpointsByTargetName(target['name'], s, project_name)
+            for item in subdomain_list:
+                for item2 in vulnerabilities_list:
+                    if item['subdomain']['subdomain_name'] == item2['subdomain']['name']:
+                        item['subdomain']['vulnerabilities'] = item2['subdomain']['vulnerabilities']
+                for item3 in urls_list:
+                    if 'urls' in item3.keys() and (
+                            item['subdomain']['subdomain_name'] == item3['subdomain_name']):
+                        item['subdomain']['urls'] = item3['urls']
+            general_summary.append(subdomain_list)
+        else:
+            print(f"No results for {target['name']}, skipping")
     console.print(Text('Finished generating report', style='bold yellow'))
     return general_summary
 

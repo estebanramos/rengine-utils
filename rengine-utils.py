@@ -127,9 +127,11 @@ match args.options:
                         case 'export-to-elastic':
                             try:
                                 es = elastic_export.initialize(args.es_host, args.es_username, args.es_password)
-                                if es: 
-                                    elastic_export.indexDocument(es, args.es_index, report)
-                                    print("Exported report to Elasticsearch")                               
+                                if es and args.all:
+                                    for r in report:
+                                        elastic_export.indexDocument(es, args.es_index, r)
+                                        print("Exported report to Elasticsearch")                            
+                                elif es: elastic_export.indexDocument(es, args.es_index, report)
                                 else: print("Failed to Connect to Elasticsearch instance")
                             except:
                                 print("Failed to send report")
