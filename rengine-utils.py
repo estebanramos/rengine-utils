@@ -77,8 +77,6 @@ target_summary_subparser_faraday.add_argument('--host', dest="faraday_host", req
 target_summary_subparser_faraday.add_argument('--user','--username',dest='faraday_username', required=True)
 target_summary_subparser_faraday.add_argument('--password',dest='faraday_password', required=True)
 target_summary_subparser_faraday.add_argument('-w', '--workspace', help='Faraday workspace', dest='faraday_workspace', required=True)
-## Mail Report
-target_mail_report_parser = target_action_subparser.add_parser("generate-report", help="Generates a report via mail")
 
 #Projects
 project_parser.add_argument("-l", "--list", action="store_true", help="List the projects")
