@@ -1,11 +1,27 @@
 # ReNgine Utils
-[ReNgine](https://github.com/yogeshojha/rengine) CLI tool based on [rengine-tool](https://github.com/glownd/rengine-tool/) by [@glownd](https://github.com/glownd).
+[ReNgine](https://github.com/yogeshojha/rengine) CLI tool for interacting with ReNgine API
 
 ## Features
 - List Vulnerabilities, Subdomains and Endpoints by Domain or Subdomain name
 - Generate Reports/Summary in various formats (JSON/CSV/Table)
 - Export to visualization/reporting services like Elasticsearch or Faraday
+- Scanning Domains for enumeration & vulnerability analysis
 
+
+### Main
+```
+usage: rengine-utils.py [-h] {authorize,target,project,scan} ...
+
+options:
+  -h, --help            show this help message and exit
+
+options:
+  {authorize,target,project,scan}
+    authorize
+    target
+    project
+    scan
+```
 ### Authorize
 Authorizing is needed to use the tool.
 ```
@@ -54,7 +70,7 @@ options:
     - Better Documentation/README (lol)
 - Exporting & Reporting
     - Export reports to ElasticSearch ✅
-    - Export reports to Faraday
+    - Export reports to Faraday ✅
     - Modular Report (Vuln/Subdomains/Urls sections)
 - Technologies
     - List Technologies by Target Name
@@ -62,3 +78,7 @@ options:
 - Tools
     - Add new custom Tools
     - Update existing Tools
+- Scan
+-   - Running Scans
+    - Listing Scans
+    - Stop Scans
