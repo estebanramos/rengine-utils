@@ -1,14 +1,37 @@
 import methods.utils as utils
-import pyperclip, os, re, socket, requests
+import pyperclip, os, re, socket, requests, colorama, traceback, signal
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
+from colorama import Fore, Style
+from pwn import *
+from termcolor import colored
 
-def generateSummaryByTargetName(name, s, project_name, clip, output, show):
+
+def def_handler(sig, frame):
+    print("Exiting...")
+    sys.exit(1)
+
+signal.signal(signal.SIGINT, def_handler)
+
+def output_file_json(filename, subdomain_list):
+    final_filename = utils.normalize_filename(filename, 'json')
+    f = open(final_filename, 'w+')
+    try:
+        for item in subdomain_list:
+            f.write(utils.prettyPrintJSON(item))
+    except:
+        pass
+    if os.path.isfile(final_filename): print(f"Report has been copied to {final_filename}")
+    
+
+def generateSummaryByTargetName(name, s, project_name, clip, output, show, vulns_filter):
+    console = Console()
+    console.print(Text(f'Generating report for: {name}', style='bold yellow'))
     # target_id = findTargetIdByName(name, s)['target_id']
     subdomain_summary = getSubdomainsByTargetName(name, s, project_name)
     subdomain_list = subdomain_summary['subdomains']
-    vulnerabilities_list = getVulnerabilitiesByTargetName(name, s)
+    vulnerabilities_list = getVulnerabilitiesByTargetName(name, s, vulns_filter)
     urls_list = getEndpointsByTargetName(name, s, project_name)
     for item in subdomain_list:
         for item2 in vulnerabilities_list:
@@ -19,17 +42,12 @@ def generateSummaryByTargetName(name, s, project_name, clip, output, show):
                     item['subdomain']['subdomain_name'] == item3['subdomain_name']):
                 item['subdomain']['urls'] = item3['urls']
 
-    if output:
-        f = open(output, 'w+')
     for item in subdomain_list:
         if show:
             utils.cleanUselessStuffFromDict(item['subdomain'], ['id'])
             print(utils.prettyPrintJSON(item))
-        if output:
-            f.write(utils.prettyPrintJSON(item))
 
-    if output and os.path.isfile(output):
-        print(f"Report has been copied to {output}")
+    if output: output_file_json(output, subdomain_list)
 
     if clip:
         try:
@@ -41,17 +59,24 @@ def generateSummaryByTargetName(name, s, project_name, clip, output, show):
     return subdomain_list
 
 
-def generateGeneralSummary(s, project_name):
+def generateGeneralSummary(s, project_name, export=None, vulns_filter=None, output="general-report.json"):
+    p1 = log.progress("Report")
     console = Console()
-    console.print(Text('This should take a while...grab a coffee', style='bold yellow'))
+    #console.print(Text('Generating report, this should take a while...grab a coffee', style='bold yellow'))
+    if export:
+        console.print(Text('...and also you are exporting, you better go touch some grass', style='bold green'))
     target_list = getTargets(s)
     general_summary = []
     for target in target_list:
-        print("Now processing: ", target['name'])
-        subdomain_summary = getSubdomainsByTargetName(target['name'], s, project_name)
-        if 'subdomains' in subdomain_summary:
+        try:
+            p1.status(f"Now processing {target['name']}")
+            #print(Fore.YELLOW + Style.BRIGHT + "[ℹ️] " + f"Now Processing: " + Style.NORMAL + f"{target['name']}" + Style.RESET_ALL)
+            subdomain_summary = getSubdomainsByTargetName(target['name'], s, project_name)
+            if 'subdomains' not in subdomain_summary:
+                print(Fore.GREEN + Style.BRIGHT + f" [✓] Finished Processing: " + Style.NORMAL + f"{target['name']}" + Style.RESET_ALL)
+                continue
             subdomain_list = subdomain_summary['subdomains']
-            vulnerabilities_list = getVulnerabilitiesByTargetName(target['name'], s)
+            vulnerabilities_list = getVulnerabilitiesByTargetName(target['name'], s, vulns_filter)
             urls_list = getEndpointsByTargetName(target['name'], s, project_name)
             for item in subdomain_list:
                 for item2 in vulnerabilities_list:
@@ -61,10 +86,17 @@ def generateGeneralSummary(s, project_name):
                     if 'urls' in item3.keys() and (
                             item['subdomain']['subdomain_name'] == item3['subdomain_name']):
                         item['subdomain']['urls'] = item3['urls']
+            p1.status(f"Finished processing: {target['name']}")
+            print(Fore.GREEN + Style.BRIGHT + f" [✓] Finished Processing: " + Style.NORMAL + f"{target['name']}" + Style.RESET_ALL)
             general_summary.append(subdomain_list)
-        else:
-            print(f"No results for {target['name']}, skipping")
+        except Exception as e:
+            if isinstance(e, SystemExit):
+                raise
+            else:
+                print(f"Error processing: {target['name']}")
+                traceback.print_exc()
     console.print(Text('Finished generating report', style='bold yellow'))
+    if output: output_file_json("general-report.json", general_summary)
     return general_summary
 
 
@@ -114,12 +146,17 @@ def listVulnerabilitiesByTargetName(name, s):
     for item in root['subdomains']:
         print(utils.prettyPrintJSON(item))
 
-
-def getVulnerabilitiesByTargetName(name, s):
+def getVulnerabilitiesByTargetName(name, s, filter=None):
+    if filter is not None:
+        filter_param = "search[value]="
+        for f in filter:
+            filter_param += f"severity={f.capitalize()} | "
+    else:
+        filter_param = "search[value]=severity=Medium | severity=High | severity=Critical | severity=Low"
     target_id = findTargetIdByName(name, s)['target_id']
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + \
-        f'/api/listVulnerability/?target_id={target_id}&format=datatables&search[value]=severity=Medium | severity=High | severity=Critical | severity=Low'
+        f'/api/listVulnerability/?target_id={target_id}&format=datatables&{filter_param}'
     csrf_token = s.cookies['csrftoken']
     headers = {'Referer': listIPsUrl,
                'Content-type': 'application/json', 'X-CSRFToken': csrf_token}
@@ -166,12 +203,11 @@ def getVulnerabilitiesByTargetName(name, s):
             temporal[subdomain]['subdomain']['vulnerabilities'].append(vuln)
     return root['subdomains']
 
-
 def listEndpointsByTargetName(name, s, project_name):
     try:
         target_id = findTargetIdByName(name, s)['target_id']
     except BaseException:
-        print("The target doesn't exists")
+        print(f"The target {name} doesn't exists in reNgine's project {project_name}")
         return
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + \
@@ -184,7 +220,6 @@ def listEndpointsByTargetName(name, s, project_name):
     mapped = mapUrlsToSubdomains(name, j, s, project_name)
     for item in mapped:
         print(utils.prettyPrintJSON(mapped))
-
 
 def getEndpointsByTargetName(name, s, project_name):
     target_id = findTargetIdByName(name, s)['target_id']
@@ -245,7 +280,7 @@ def listSubdomainsByTargetNameJSON(name, s, project):
     root = {"domain": name, "subdomains": []}
     temporal = []
     if not len(j['data']):
-        print("Target exists but doesn't have subdomains associated. Be sure to scan it for subdomains")
+        print(f" {name} Target exists but doesn't have subdomains associated. Be sure to scan it for subdomains or ensure that you are selecting the correct project")
         return {}
     for item in j['data']:
         subdomain = item['name']
@@ -348,21 +383,27 @@ def getSubdomainsByTargetName(name, s, project):
     target_id = findTargetIdByName(name, s)['target_id']
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + \
-        f'/api/listDatatableSubdomain/?project={project}&target_id={target_id}&format=datatables&&format=datatables&draw=1&columns[0][data]=id&columns[0][name]=&columns[0][searchable]=true&columns[0][orderable]=false&columns[0][search][value]=&columns[0][search][regex]=false&columns[1][data]=name&columns[1][name]=&columns[1][searchable]=true&columns[1][orderable]=true&columns[1][search][value]=&columns[1][search][regex]=false&columns[2][data]=endpoint_count&columns[2][name]=&columns[2][searchable]=false&columns[2][orderable]=false&columns[2][search][value]=&columns[2][search][regex]=false&columns[3][data]=endpoint_count&columns[3][name]=&columns[3][searchable]=false&columns[3][orderable]=false&columns[3][search][value]=&columns[3][search][regex]=false&columns[4][data]=http_status&columns[4][name]=&columns[4][searchable]=true&columns[4][orderable]=true&columns[4][search][value]=&columns[4][search][regex]=false&columns[5][data]=page_title&columns[5][name]=&columns[5][searchable]=true&columns[5][orderable]=true&columns[5][search][value]=&columns[5][search][regex]=false&columns[6][data]=ip_addresses&columns[6][name]=&columns[6][searchable]=true&columns[6][orderable]=false&columns[6][search][value]=&columns[6][search][regex]=false&columns[7][data]=ip_addresses&columns[7][name]=&columns[7][searchable]=true&columns[7][orderable]=false&columns[7][search][value]=&columns[7][search][regex]=false&columns[8][data]=content_length&columns[8][name]=&columns[8][searchable]=false&columns[8][orderable]=true&columns[8][search][value]=&columns[8][search][regex]=false&columns[9][data]=screenshot_path&columns[9][name]=&columns[9][searchable]=false&columns[9][orderable]=false&columns[9][search][value]=&columns[9][search][regex]=false&columns[10][data]=response_time&columns[10][name]=&columns[10][searchable]=true&columns[10][orderable]=true&columns[10][search][value]=&columns[10][search][regex]=false&columns[11][data]=technologies&columns[11][name]=&columns[11][searchable]=true&columns[11][orderable]=true&columns[11][search][value]=&columns[11][search][regex]=false&columns[12][data]=http_url&columns[12][name]=&columns[12][searchable]=false&columns[12][orderable]=true&columns[12][search][value]=&columns[12][search][regex]=false&columns[13][data]=cname&columns[13][name]=&columns[13][searchable]=false&columns[13][orderable]=true&columns[13][search][value]=&columns[13][search][regex]=false&columns[14][data]=is_interesting&columns[14][name]=&columns[14][searchable]=false&columns[14][orderable]=true&columns[14][search][value]=&columns[14][search][regex]=false&columns[15][data]=info_count&columns[15][name]=&columns[15][searchable]=false&columns[15][orderable]=true&columns[15][search][value]=&columns[15][search][regex]=false&columns[16][data]=low_count&columns[16][name]=&columns[16][searchable]=false&columns[16][orderable]=true&columns[16][search][value]=&columns[16][search][regex]=false&columns[17][data]=medium_count&columns[17][name]=&columns[17][searchable]=false&columns[17][orderable]=true&columns[17][search][value]=&columns[17][search][regex]=false&columns[18][data]=high_count&columns[18][name]=&columns[18][searchable]=false&columns[18][orderable]=true&columns[18][search][value]=&columns[18][search][regex]=false&columns[19][data]=critical_count&columns[19][name]=&columns[19][searchable]=false&columns[19][orderable]=true&columns[19][search][value]=&columns[19][search][regex]=false&columns[20][data]=todos_count&columns[20][name]=&columns[20][searchable]=false&columns[20][orderable]=true&columns[20][search][value]=&columns[20][search][regex]=false&columns[21][data]=is_important&columns[21][name]=&columns[21][searchable]=false&columns[21][orderable]=true&columns[21][search][value]=&columns[21][search][regex]=false&columns[22][data]=webserver&columns[22][name]=&columns[22][searchable]=true&columns[22][orderable]=true&columns[22][search][value]=&columns[22][search][regex]=false&columns[23][data]=content_type&columns[23][name]=&columns[23][searchable]=true&columns[23][orderable]=true&columns[23][search][value]=&columns[23][search][regex]=false&columns[24][data]=id&columns[24][name]=&columns[24][searchable]=true&columns[24][orderable]=true&columns[24][search][value]=&columns[24][search][regex]=false&columns[25][data]=directories_count&columns[25][name]=&columns[25][searchable]=false&columns[25][orderable]=true&columns[25][search][value]=&columns[25][search][regex]=false&columns[26][data]=subscan_count&columns[26][name]=&columns[26][searchable]=false&columns[26][orderable]=true&columns[26][search][value]=&columns[26][search][regex]=false&columns[27][data]=waf&columns[27][name]=&columns[27][searchable]=false&columns[27][orderable]=true&columns[27][search][value]=&columns[27][search][regex]=false&columns[28][data]=attack_surface&columns[28][name]=&columns[28][searchable]=false&columns[28][orderable]=true&columns[28][search][value]=&columns[28][search][regex]=false&order[0][column]=8&order[0][dir]=desc&start=0&length=-1&search[value]=&search[regex]=false&_=1718121185224'
+        f'/api/listDatatableSubdomain/?project={project}&target_id={target_id}&format=datatables&&format=datatables&draw=1'
     csrf_token = s.cookies['csrftoken']
     headers = {'Referer': listIPsUrl,
                'Content-type': 'application/json', 'X-CSRFToken': csrf_token}
     r = s.get(listIPsUrl, headers=headers, verify=False)
-    j = r.json()
+    try:
+        j = r.json()
+    except:
+        print("Failed to process json", r)
+        return 
     root = {"domain": name, "subdomains": []}
     temporal = []
     if not len(j['data']):
-        print("Target exists but doesn't have subdomains associated. Be sure to scan it for subdomains")
+        print(colored(f" [!] {name} domain exists but doesn't have any subdomains associated. Be sure to scan it for subdomains",'yellow', attrs=['bold']))
         return {}
     subdomain_list = removeDuplicatedSubdomains(j['data'])
     for item in subdomain_list:
         subdomain = item['name']
         http_status = item['http_status']
+        if 'page_title' in item: page_title = item['page_title']
+        else: page_title = ""
         if item['name'] not in temporal:
             ip_addresses = []
             if item['ip_addresses']:
@@ -377,15 +418,19 @@ def getSubdomainsByTargetName(name, s, project):
                         ports.append(port_info)
                     ip_address = {
                         "address": item2['address'],
-                        "ports": port_info}
+                        "ports": item2['ports']}
                     ip_addresses.append(ip_address)
+            if item['discovered_date']:
+                discovered_date = item['discovered_date']
 
             i = {"subdomain": {
                 "domain": name,
                 "subdomain_name": subdomain,
                 "ip_addresses": ip_addresses,
                 "id": item['id'],
-                "http_status": http_status
+                "http_status": http_status,
+                "page_title": page_title,
+                "discovered_date": discovered_date
 
             }
             }
@@ -395,6 +440,7 @@ def getSubdomainsByTargetName(name, s, project):
 
 
 def findTargetIdByName(name, s):
+
     baseUrl = s.cookies['hostname']
     listIPsUrl = baseUrl + '/api/listTargets/?format=datatables'
     csrf_token = s.cookies['csrftoken']
