@@ -8,6 +8,6 @@ def run_scan(s, name, project_name):
     headers = {'Referer': runScanEndpoint, 'Content-type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf_token}
     data = {"csrfmiddlewaretoken": csrf_token, "scan_mode": 6, "importSubdomainTextArea": "", "outOfScopeSubdomainTextarea": "", "filterPath": ""}
     print(runScanEndpoint)
-    r = s.post(runScanEndpoint, headers=headers, data=data, verify=False, proxies={"https":"http://192.168.0.3:8080"})
+    r = s.post(runScanEndpoint, headers=headers, data=data, verify=False)
     if r.status_code == 200 or r.status_code == 302:
         print("Running scan...")
